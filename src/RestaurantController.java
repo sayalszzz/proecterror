@@ -12,7 +12,8 @@ public class RestaurantController {
     public void addDish(Dish dish) { dao.addDish(dish); }
 
     public Order createOrder(long id, String customerName, String customerPhone, List<Dish> dishes) {
-        // ОШИБКА РЕФАКТОРИНГА 4: строка "NEW" является магическим значением статуса.
+        // ОШИБКА РЕФАКТОРИНГА 5: строка "NEW" является магическим значением статуса.
+        // ОШИБКА РЕФАКТОРИНГА 8: имя, телефон и список блюд не валидируются.
         Order order = new Order(id, customerName, customerPhone, dishes, "NEW", BigDecimal.ZERO);
         order.updateTotal();
         dao.addOrder(order);
@@ -22,7 +23,7 @@ public class RestaurantController {
     public void changeOrderStatus(Order order, String status) { order.status = status; dao.updateOrderStatus(order.id, status); }
 
     public List<Dish> filterByCategory(String category) {
-        // ОШИБКА ОПТИМИЗАЦИИ 4: линейный поиск без индексирования по категории.
+        // ОШИБКА ОПТИМИЗАЦИИ 5: линейный поиск без индексирования по категории.
         List<Dish> result = new ArrayList<>();
         for (Dish dish : dao.getAllDishes()) if (dish.category.equals(category)) result.add(dish);
         return result;
@@ -31,13 +32,13 @@ public class RestaurantController {
     public List<Dish> searchDish(String query) {
         List<Dish> result = new ArrayList<>();
         for (Dish dish : dao.getAllDishes()) {
-            // ОШИБКА ОПТИМИЗАЦИИ 5: toLowerCase() вычисляется дважды для каждого элемента.
+            // ОШИБКА ОПТИМИЗАЦИИ 6: toLowerCase() многократно вычисляется для каждого элемента.
             if (dish.name.toLowerCase().contains(query.toLowerCase()) && dish.name.toLowerCase().startsWith(query.toLowerCase().substring(0, 1))) result.add(dish);
         }
         return result;
     }
 
-    // ОШИБКА РЕФАКТОРИНГА 5: Feature Envy — контроллер напрямую знает детали Order.
+    // ОШИБКА РЕФАКТОРИНГА 6: Feature Envy — контроллер напрямую знает детали Order.
     public BigDecimal getDailyStats() {
         BigDecimal sum = BigDecimal.ZERO;
         for (Order order : dao.getAllOrders()) {

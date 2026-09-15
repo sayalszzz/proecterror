@@ -2,7 +2,7 @@
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
-.kotlin
+.kotlin/
 
 ### Eclipse ###
 .apt_generated
@@ -28,3 +28,26 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+
+### Maven ###
+target/
+
+### Runtime files ###
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.log
+
+### Java ###
+*.class
+
+### Local report and presentation build artifacts ###
+.pptx-build/
+.pptx-validated/
+.chart-data-*/
+qa/report-render-*/

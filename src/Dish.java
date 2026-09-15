@@ -1,6 +1,6 @@
 import java.math.BigDecimal;
 
-// ОШИБКА РЕФАКТОРИНГА 1: публичные поля нарушают инкапсуляцию.
+// ОШИБКА РЕФАКТОРИНГА 1: все поля публичные и нарушают инкапсуляцию.
 public class Dish {
     public long id;
     public String name;
@@ -11,7 +11,9 @@ public class Dish {
     public String description;
     public boolean available;
 
-    // ОШИБКА РЕФАКТОРИНГА 2: длинный список параметров.
+    // ОШИБКА РЕФАКТОРИНГА 2: конструктор содержит 8 параметров.
+    // ОШИБКА РЕФАКТОРИНГА 7 и 10: weight/calories — группа несгруппированных данных.
+    // ОШИБКА РЕФАКТОРИНГА 8: значения не проверяются на пустоту, знак и допустимый диапазон.
     public Dish(long id, String name, String category, BigDecimal price, int weight, int calories, String description, boolean available) {
         this.id = id; this.name = name; this.category = category; this.price = price;
         this.weight = weight; this.calories = calories; this.description = description; this.available = available;

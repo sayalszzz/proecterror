@@ -1,0 +1,34 @@
+{
+  "dataset": {
+    "dishes": 5000,
+    "orders": 1000,
+    "order_items": 5000
+  },
+  "unit": "milliseconds, median of 7 runs",
+  "scenarios": [
+    {
+      "name": "Загрузка заказов",
+      "before": 28.525,
+      "after": 2.224,
+      "before_method": "N+1",
+      "after_method": "JOIN",
+      "speedup": 12.8
+    },
+    {
+      "name": "Фильтрация категории",
+      "before": 4.73,
+      "after": 0.08,
+      "before_method": "загрузка всех строк и O(n)",
+      "after_method": "индексированный SQL с LIMIT",
+      "speedup": 59.1
+    },
+    {
+      "name": "Повторное чтение меню",
+      "before": 7.666,
+      "after": 0.023,
+      "before_method": "100 запросов SQLite",
+      "after_method": "кэш страницы",
+      "speedup": 333.3
+    }
+  ]
+}
