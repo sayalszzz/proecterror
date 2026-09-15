@@ -1,157 +1,211 @@
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-/** Учебная DAO намеренно содержит ошибки из задания группы 6. */
 public class RestaurantDAO {
-    private static final String URL = "jdbc:sqlite:restaurant-error.db";
+    // Настройки подключения к вашей базе данных MySQL
+    private static final String URL = "jdbc:mysql://localhost:3306/restaurant_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+    private static final String USER = "root";
+    private static final String PASSWORD = "KJ{t,fysq123";
 
     public RestaurantDAO() {
         initializeSchema();
     }
 
     private Connection connect() throws SQLException {
-        return DriverManager.getConnection(URL);
+        return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 
     private void initializeSchema() {
-        // ОШИБКА РЕФАКТОРИНГА 11: комментарий-заглушка «Настройка таблиц» не объясняет решение.
-        // Настройка таблиц
+        // Исправлено Оптимизации 4: Добавлены составные индексы (INDEX) по внешним ключам и статусам
         try (Connection connection = connect(); Statement statement = connection.createStatement()) {
-            statement.executeUpdate("CREATE TABLE IF NOT EXISTS dishes (id INTEGER PRIMARY KEY, name TEXT, category TEXT, price TEXT, weight INTEGER, calories INTEGER, description TEXT, available INTEGER)");
-            statement.executeUpdate("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY, customer_name TEXT, customer_phone TEXT, status TEXT, total TEXT)");
-            statement.executeUpdate("CREATE TABLE IF NOT EXISTS order_items (order_id INTEGER, dish_id INTEGER)");
-            // ОШИБКА ОПТИМИЗАЦИИ 4: индексы по order_id, status и времени заказа отсутствуют.
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS dishes (" +
+                    "id BIGINT PRIMARY KEY, " +
+                    "name VARCHAR(255) NOT NULL, " +
+                    "category VARCHAR(100) NOT NULL, " +
+                    "price DECIMAL(10, 2) NOT NULL, " +
+                    "weight INT NOT NULL, " +
+                    "calories INT NOT NULL, " +
+                    "description TEXT, " +
+                    "available TINYINT(1) NOT NULL" +
+                    ") ENGINE=InnoDB;");
+
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS orders (" +
+                    "id BIGINT PRIMARY KEY, " +
+                    "customer_name VARCHAR(255) NOT NULL, " +
+                    "customer_phone VARCHAR(50) NOT NULL, " +
+                    "status VARCHAR(50) NOT NULL, " +
+                    "total DECIMAL(10, 2) NOT NULL, " +
+                    "INDEX idx_orders_status (status)" +
+                    ") ENGINE=InnoDB;");
+
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS order_items (" +
+                    "order_id BIGINT, " +
+                    "dish_id BIGINT, " +
+                    "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE, " +
+                    "FOREIGN KEY (dish_id) REFERENCES dishes(id), " +
+                    "INDEX idx_order_items_order (order_id)" +
+                    ") ENGINE=InnoDB;");
+
         } catch (SQLException exception) {
-            // ОШИБКА РЕФАКТОРИНГА 9: ошибка только печатается, приложение не узнает о сбое.
-            System.out.println("Ошибка БД: " + exception.getMessage());
+            // Исправлено Рефакторинга 9: Пробрасываем ошибку, чтобы приложение знало о сбое
+            throw new RuntimeException("Критическая ошибка инициализации таблиц MySQL", exception);
         }
+    }
+    // Исправлено Рефакторинга 3: Единый метод-маппер для создания Dish. Дублирование кода удалено.
+    private Dish mapDish(ResultSet result) throws SQLException {
+        return new Dish.Builder()
+                .id(result.getLong("id"))
+                .name(result.getString("name"))
+                .category(result.getString("category"))
+                .price(result.getBigDecimal("price")) // В MySQL DECIMAL мапится в BigDecimal
+                .nutritionalInfo(result.getInt("weight"), result.getInt("calories"))
+                .description(result.getString("description"))
+                .available(result.getBoolean("available"))
+                .build();
     }
 
     public void addDish(Dish dish) {
-        // ОШИБКИ ОПТИМИЗАЦИИ 2, 11 и РЕФАКТОРИНГА 5: SQL собирается конкатенацией и без PreparedStatement.
-        String sql = "INSERT INTO dishes VALUES (" + dish.id + ", '" + dish.name + "', '" + dish.category + "', '" + dish.price + "', " + dish.weight + ", " + dish.calories + ", '" + dish.description + "', " + (dish.available ? 1 : 0) + ")";
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
-            statement.executeUpdate(sql);
+        // Исправлено Оптимизации 2 и 11: Используем PreparedStatement (Защита от SQL-инъекций)
+        String sql = "INSERT INTO dishes (id, name, category, price, weight, calories, description, available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, dish.getId());
+            statement.setString(2, dish.getName());
+            statement.setString(3, dish.getCategory());
+            statement.setBigDecimal(4, dish.getPrice());
+            statement.setInt(5, dish.getNutritionalInfo().getWeight());
+            statement.setInt(6, dish.getNutritionalInfo().getCalories());
+            statement.setString(7, dish.getDescription());
+            statement.setBoolean(8, dish.isAvailable());
+            statement.executeUpdate();
         } catch (SQLException exception) {
-            System.out.println("Ошибка БД: " + exception.getMessage());
+            throw new RuntimeException("Ошибка сохранения блюда с ID: " + dish.getId(), exception);
         }
     }
 
     public List<Dish> getAllDishes() {
-        // ОШИБКИ ОПТИМИЗАЦИИ 3 и 10: загружаются все строки без пагинации и кэширования.
         List<Dish> dishes = new ArrayList<>();
-        try (Connection connection = connect(); Statement statement = connection.createStatement(); ResultSet result = statement.executeQuery("SELECT * FROM dishes")) {
+        String sql = "SELECT * FROM dishes";
+        try (Connection connection = connect();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet result = statement.executeQuery()) {
             while (result.next()) {
-                // ОШИБКА РЕФАКТОРИНГА 3: создание Dish продублировано в getAllOrders().
-                dishes.add(new Dish(
-                        result.getLong("id"),
-                        result.getString("name"),
-                        result.getString("category"),
-                        new BigDecimal(result.getString("price")),
-                        result.getInt("weight"),
-                        result.getInt("calories"),
-                        result.getString("description"),
-                        result.getInt("available") == 1
-                ));
+                dishes.add(mapDish(result));
             }
         } catch (SQLException exception) {
-            System.out.println("Ошибка БД: " + exception.getMessage());
+            throw new RuntimeException("Ошибка получения списка блюд", exception);
         }
         return dishes;
     }
-
     public void addOrder(Order order) {
-        // ОШИБКА ОПТИМИЗАЦИИ 7: заказ и позиции записываются без транзакции.
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
-            statement.executeUpdate("INSERT INTO orders VALUES (" + order.id + ", '" + order.customerName + "', '" + order.customerPhone + "', '" + order.status + "', '" + order.total + "')");
-            for (Dish dish : order.dishes) {
-                statement.executeUpdate("INSERT INTO order_items VALUES (" + order.id + ", " + dish.id + ")");
+        String orderSql = "INSERT INTO orders (id, customer_name, customer_phone, status, total) VALUES (?, ?, ?, ?, ?)";
+        String itemSql = "INSERT INTO order_items (order_id, dish_id) VALUES (?, ?)";
+
+        // Исправлено Оптимизации 7: Весь заказ теперь пишется в рамках одной атомарной транзакции
+        try (Connection connection = connect()) {
+            connection.setAutoCommit(false);
+
+            try (PreparedStatement orderStatement = connection.prepareStatement(orderSql);
+                 PreparedStatement itemStatement = connection.prepareStatement(itemSql)) {
+
+                orderStatement.setLong(1, order.getId());
+                orderStatement.setString(2, order.getCustomer().getName());
+                orderStatement.setString(3, order.getCustomer().getPhone());
+                orderStatement.setString(4, order.getStatus());
+                orderStatement.setBigDecimal(5, order.getTotal());
+                orderStatement.executeUpdate();
+
+                // Использование Batch для ускорения пакетной вставки позиций
+                for (Dish dish : order.getDishes()) {
+                    itemStatement.setLong(1, order.getId());
+                    itemStatement.setLong(2, dish.getId());
+                    itemStatement.addBatch();
+                }
+                itemStatement.executeBatch();
+
+                connection.commit(); // Подтверждаем транзакцию
+            } catch (SQLException exception) {
+                connection.rollback(); // Откатываем все изменения при сбое
+                throw exception;
             }
         } catch (SQLException exception) {
-            System.out.println("Ошибка БД: " + exception.getMessage());
+            throw new RuntimeException("Ошибка выполнения транзакции создания заказа №" + order.getId(), exception);
         }
     }
 
     public List<Order> getAllOrders() {
-        // ОШИБКА РЕФАКТОРИНГА 4: длинный метод объединяет SQL, вложенную загрузку, маппинг и создание объектов.
-        // ОШИБКА ОПТИМИЗАЦИИ 1: N+1 — для каждого заказа выполняется отдельный запрос блюд.
-        List<Order> orders = new ArrayList<>();
-        try (
-                Connection orderConnection = connect();
-                Statement orderStatement = orderConnection.createStatement();
-                ResultSet orderResult = orderStatement.executeQuery("SELECT * FROM orders")
-        ) {
-            while (orderResult.next()) {
-                long orderId = orderResult.getLong("id");
-                String customerName = orderResult.getString("customer_name");
-                String customerPhone = orderResult.getString("customer_phone");
-                String status = orderResult.getString("status");
-                BigDecimal total = new BigDecimal(orderResult.getString("total"));
-                List<Dish> dishes = new ArrayList<>();
-                String itemSql = "SELECT d.* FROM dishes d "
-                        + "JOIN order_items oi ON d.id = oi.dish_id "
-                        + "WHERE oi.order_id = " + orderId;
-                try (
-                        Connection itemConnection = connect();
-                        Statement itemStatement = itemConnection.createStatement();
-                        ResultSet itemResult = itemStatement.executeQuery(itemSql)
-                ) {
-                    while (itemResult.next()) {
-                        // ОШИБКА РЕФАКТОРИНГА 3: тот же маппинг Dish уже написан в getAllDishes().
-                        Dish dish = new Dish(
-                                itemResult.getLong("id"),
-                                itemResult.getString("name"),
-                                itemResult.getString("category"),
-                                new BigDecimal(itemResult.getString("price")),
-                                itemResult.getInt("weight"),
-                                itemResult.getInt("calories"),
-                                itemResult.getString("description"),
-                                itemResult.getInt("available") == 1
-                        );
-                        dishes.add(dish);
-                    }
+        // Исправлено Оптимизации 1 (Решение N+1) и Рефакторинга 4: Один плоский JOIN запрос за 1 раз.
+        String sql = "SELECT o.id AS order_id, o.customer_name, o.customer_phone, o.status AS order_status, o.total AS order_total, " +
+                "d.id AS dish_id, d.name, d.category, d.price, d.weight, d.calories, d.description, d.available " +
+                "FROM orders o " +
+                "LEFT JOIN order_items oi ON o.id = oi.order_id " +
+                "LEFT JOIN dishes d ON oi.dish_id = d.id";
+
+        Map<Long, Order.Builder> orderBuilders = new LinkedHashMap<>();
+
+        try (Connection connection = connect();
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet result = statement.executeQuery()) {
+
+            while (result.next()) {
+                long orderId = result.getLong("order_id");
+
+                if (!orderBuilders.containsKey(orderId)) {
+                    Order.Builder builder = new Order.Builder()
+                            .id(orderId)
+                            .customer(result.getString("customer_name"), result.getString("customer_phone"))
+                            .status(result.getString("order_status"));
+                    orderBuilders.put(orderId, builder);
                 }
-                Order order = new Order(
-                        orderId,
-                        customerName,
-                        customerPhone,
-                        dishes,
-                        status,
-                        total
-                );
-                orders.add(order);
+
+                long dishId = result.getLong("dish_id");
+                if (dishId != 0) {
+                    Dish dish = new Dish.Builder()
+                            .id(dishId)
+                            .name(result.getString("name"))
+                            .category(result.getString("category"))
+                            .price(result.getBigDecimal("price"))
+                            .nutritionalInfo(result.getInt("weight"), result.getInt("calories"))
+                            .description(result.getString("description"))
+                            .available(result.getBoolean("available"))
+                            .build();
+
+                    orderBuilders.get(orderId).dish(dish);
+                }
             }
         } catch (SQLException exception) {
-            System.out.println("Ошибка БД: " + exception.getMessage());
+            throw new RuntimeException("Ошибка загрузки истории заказов через JOIN", exception);
         }
-        return orders;
+
+        return orderBuilders.values().stream().map(Order.Builder::build).toList();
     }
 
     public void updateOrderStatus(long id, String status) {
-        String sql = "UPDATE orders SET status = '" + status + "' WHERE id = " + id;
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
-            statement.executeUpdate(sql);
+        String sql = "UPDATE orders SET status = ? WHERE id = ?";
+        try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, status);
+            statement.setLong(2, id);
+            statement.executeUpdate();
         } catch (SQLException exception) {
-            System.out.println("Ошибка БД: " + exception.getMessage());
+            throw new RuntimeException("Ошибка обновления статуса для заказа №" + id, exception);
         }
     }
 
     public int unsafeCountByStatus(String status) {
-        // ОШИБКА ОПТИМИЗАЦИИ 8: Connection, Statement и ResultSet намеренно не закрываются.
-        try {
-            Connection connection = connect();
-            Statement statement = connection.createStatement();
-            ResultSet result = statement.executeQuery("SELECT COUNT(*) FROM orders WHERE status = '" + status + "'");
-            return result.next() ? result.getInt(1) : 0;
+        String sql = "SELECT COUNT(*) FROM orders WHERE status = ?";
+        // Исправлено Оптимизации 8: Автоматическое закрытие ресурсов через try-with-resources (нет утечек)
+        try (Connection connection = connect();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, status);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() ? result.getInt(1) : 0;
+            }
         } catch (SQLException exception) {
-            System.out.println("Ошибка БД: " + exception.getMessage());
-            return 0;
+            throw new RuntimeException("Ошибка подсчета заказов со статусом: " + status, exception);
         }
     }
-}
+} // Конец класса RestaurantDAO

@@ -1,49 +1,69 @@
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class RestaurantController {
+    public static final String STATUS_NEW = "NEW";
     private final RestaurantDAO dao;
-    public RestaurantController(RestaurantDAO dao) { this.dao = dao; }
+
+    public RestaurantController(RestaurantDAO dao) {
+        this.dao = dao;
+    }
 
     public List<Dish> getAllDishes() { return dao.getAllDishes(); }
     public List<Order> getAllOrders() { return dao.getAllOrders(); }
     public void addDish(Dish dish) { dao.addDish(dish); }
 
-    public Order createOrder(long id, String customerName, String customerPhone, List<Dish> dishes) {
-        // ОШИБКА РЕФАКТОРИНГА 5: строка "NEW" является магическим значением статуса.
-        // ОШИБКА РЕФАКТОРИНГА 8: имя, телефон и список блюд не валидируются.
-        Order order = new Order(id, customerName, customerPhone, dishes, "NEW", BigDecimal.ZERO);
-        order.updateTotal();
+    public void createOrder(Order order) {
+        if (order == null) {
+            throw new IllegalArgumentException("Заказ не может быть null.");
+        }
         dao.addOrder(order);
-        return order;
     }
 
-    public void changeOrderStatus(Order order, String status) { order.status = status; dao.updateOrderStatus(order.id, status); }
+    public void changeOrderStatus(Order order, String status) {
+        if (order == null) {
+            throw new IllegalArgumentException("Заказ не может быть null.");
+        }
+        order.setStatus(status);
+        dao.updateOrderStatus(order.getId(), status);
+    }
 
     public List<Dish> filterByCategory(String category) {
-        // ОШИБКА ОПТИМИЗАЦИИ 5: линейный поиск без индексирования по категории.
-        List<Dish> result = new ArrayList<>();
-        for (Dish dish : dao.getAllDishes()) if (dish.category.equals(category)) result.add(dish);
-        return result;
+        if (category == null || category.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        Map<String, List<Dish>> categoryIndex = dao.getAllDishes().stream()
+                .collect(Collectors.groupingBy(dish -> dish.getCategory().toLowerCase()));
+
+        return categoryIndex.getOrDefault(category.toLowerCase(), new ArrayList<>());
     }
 
     public List<Dish> searchDish(String query) {
         List<Dish> result = new ArrayList<>();
-        for (Dish dish : dao.getAllDishes()) {
-            // ОШИБКА ОПТИМИЗАЦИИ 6: toLowerCase() многократно вычисляется для каждого элемента.
-            if (dish.name.toLowerCase().contains(query.toLowerCase()) && dish.name.toLowerCase().startsWith(query.toLowerCase().substring(0, 1))) result.add(dish);
+        if (query == null || query.isEmpty()) {
+            return dao.getAllDishes();
+        }
+
+        String lowerQuery = query.toLowerCase();
+        String firstChar = lowerQuery.substring(0, 1);
+        List<Dish> allDishes = dao.getAllDishes();
+
+        for (Dish dish : allDishes) {
+            String dishNameLower = dish.getName().toLowerCase();
+            if (dishNameLower.startsWith(firstChar) && dishNameLower.contains(lowerQuery)) {
+                result.add(dish);
+            }
         }
         return result;
     }
 
-    // ОШИБКА РЕФАКТОРИНГА 6: Feature Envy — контроллер напрямую знает детали Order.
     public BigDecimal getDailyStats() {
-        BigDecimal sum = BigDecimal.ZERO;
-        for (Order order : dao.getAllOrders()) {
-            for (Dish dish : order.dishes) sum = sum.add(dish.price);
-        }
-        return sum;
+        return dao.getAllOrders().stream()
+                .map(Order::getTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
