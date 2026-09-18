@@ -20,35 +20,35 @@ public class RestaurantDAO {
     }
 
     private void initializeSchema() {
-        // ОШИБКА РЕФАКТОРИНГА 11: комментарий-заглушка «Настройка таблиц» не объясняет решение.
-        // Настройка таблиц
+
         try (Connection connection = connect(); Statement statement = connection.createStatement()) {
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS dishes (id INTEGER PRIMARY KEY, name TEXT, category TEXT, price TEXT, weight INTEGER, calories INTEGER, description TEXT, available INTEGER)");
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY, customer_name TEXT, customer_phone TEXT, status TEXT, total TEXT)");
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS order_items (order_id INTEGER, dish_id INTEGER)");
-            // ОШИБКА ОПТИМИЗАЦИИ 4: индексы по order_id, status и времени заказа отсутствуют.
         } catch (SQLException exception) {
-            // ОШИБКА РЕФАКТОРИНГА 9: ошибка только печатается, приложение не узнает о сбое.
+            // ОШИБКА РЕФАКТОРИНГА 8: ошибка только печатается, приложение не узнает о сбое.
             System.out.println("Ошибка БД: " + exception.getMessage());
         }
     }
 
     public void addDish(Dish dish) {
-        // ОШИБКИ ОПТИМИЗАЦИИ 2, 11 и РЕФАКТОРИНГА 5: SQL собирается конкатенацией и без PreparedStatement.
         String sql = "INSERT INTO dishes VALUES (" + dish.id + ", '" + dish.name + "', '" + dish.category + "', '" + dish.price + "', " + dish.weight + ", " + dish.calories + ", '" + dish.description + "', " + (dish.available ? 1 : 0) + ")";
         try (Connection connection = connect(); Statement statement = connection.createStatement()) {
             statement.executeUpdate(sql);
         } catch (SQLException exception) {
+            //ОШИБКА РЕВАКТОРИНГА 8 - ОШИБКА ТОЛЬКО ПЕЧАТАЕСЯ
+
             System.out.println("Ошибка БД: " + exception.getMessage());
         }
     }
 
     public List<Dish> getAllDishes() {
-        // ОШИБКИ ОПТИМИЗАЦИИ 3 и 10: загружаются все строки без пагинации и кэширования.
+        // ОШИБКИ ОПТИМИЗАЦИИ 1: загружаются все строки без пагинации и кэширования.
         List<Dish> dishes = new ArrayList<>();
         try (Connection connection = connect(); Statement statement = connection.createStatement(); ResultSet result = statement.executeQuery("SELECT * FROM dishes")) {
             while (result.next()) {
-                // ОШИБКА РЕФАКТОРИНГА 3: создание Dish продублировано в getAllOrders().
+                //ОШИБКА РЕВАКТОРИНГА 3 - Создание dish  продублировано
+
                 dishes.add(new Dish(
                         result.getLong("id"),
                         result.getString("name"),
@@ -74,6 +74,8 @@ public class RestaurantDAO {
                 statement.executeUpdate("INSERT INTO order_items VALUES (" + order.id + ", " + dish.id + ")");
             }
         } catch (SQLException exception) {
+            //ОШИБКА РЕВАКТОРИНГА 8 - ОШИБКА ТОЛЬКО ПЕЧАТАЕСЯ
+
             System.out.println("Ошибка БД: " + exception.getMessage());
         }
     }
@@ -128,6 +130,8 @@ public class RestaurantDAO {
                 orders.add(order);
             }
         } catch (SQLException exception) {
+            //ОШИБКА РЕВАКТОРИНГА 8 - ОШИБКА ТОЛЬКО ПЕЧАТАЕСЯ
+
             System.out.println("Ошибка БД: " + exception.getMessage());
         }
         return orders;
@@ -138,6 +142,7 @@ public class RestaurantDAO {
         try (Connection connection = connect(); Statement statement = connection.createStatement()) {
             statement.executeUpdate(sql);
         } catch (SQLException exception) {
+            //ОШИБКА РЕВАКТОРИНГА 8 - ОШИБКА ТОЛЬКО ПЕЧАТАЕСЯ
             System.out.println("Ошибка БД: " + exception.getMessage());
         }
     }

@@ -12,8 +12,7 @@ public class Dish {
     public boolean available;
 
     // ОШИБКА РЕФАКТОРИНГА 2: конструктор содержит 8 параметров.
-    // ОШИБКА РЕФАКТОРИНГА 7 и 10: weight/calories — группа несгруппированных данных.
-    // ОШИБКА РЕФАКТОРИНГА 8: значения не проверяются на пустоту, знак и допустимый диапазон.
+    // ОШИБКА РЕФАКТОРИНГА 7: weight/calories — группа несгруппированных данных.
     public Dish(long id, String name, String category, BigDecimal price, int weight, int calories, String description, boolean available) {
         this.id = id; this.name = name; this.category = category; this.price = price;
         this.weight = weight; this.calories = calories; this.description = description; this.available = available;

@@ -22,7 +22,7 @@ public class RestaurantApp extends Application {
     private boolean refreshing;
 
     @Override public void start(Stage stage) {
-        // ОШИБКА ОПТИМИЗАЦИИ 12: DAO и все запросы вызываются непосредственно из JavaFX Application Thread.
+        // ОШИБКА ОПТИМИЗАЦИИ 6: DAO и все запросы вызываются непосредственно из JavaFX Application Thread.
         RestaurantDAO dao = new RestaurantDAO(); controller = new RestaurantController(dao);
         if (controller.getAllDishes().isEmpty()) {
             controller.addDish(new Dish(1,"Том ям","Супы",new BigDecimal("420"),350,310,"Острый суп",true));
@@ -49,7 +49,8 @@ public class RestaurantApp extends Application {
     private void addToCart(){ List<Integer> selected=menu.getSelectionModel().getSelectedIndices(); if(selected.isEmpty()){warn("Выберите блюдо.");return;} List<Dish> dishes=visibleDishes(); selected.forEach(i->cartDishes.add(dishes.get(i))); refreshCart(); menu.getSelectionModel().clearSelection(); }
     private void refreshCart(){ cart.setItems(FXCollections.observableArrayList(cartDishes.stream().map(d->d.name+" | "+d.price+" руб.").toList())); BigDecimal sum=cartDishes.stream().map(d->d.price).reduce(BigDecimal.ZERO,BigDecimal::add); total.setText("Стоимость заказа: "+sum+" руб."); }
     private void createOrder(){ if(cartDishes.isEmpty()){warn("Заказ пуст.");return;} long id=controller.getAllOrders().stream().mapToLong(o->o.id).max().orElse(0)+1; Order order=controller.createOrder(id,name.getText(),phone.getText(),List.copyOf(cartDishes)); controller.changeOrderStatus(order,status.getValue()); cartDishes.clear(); refreshCart(); refreshAll(); }
-    // ОШИБКА ОПТИМИЗАЦИИ 10: одни и те же данные повторно читаются из БД без кэширования.
+    // ОШИБКА ОПТИМИЗАЦИИ 1: одни и те же данные повторно читаются из БД без кэширования.
+    //ОШИБКА ОПТИМИЗАЦИИ 5 - дубль п.1 - кэш не используется и здесь
     private void refreshAll(){if(refreshing)return;refreshing=true;String selectedCategory=category.getValue();List<String> cs=new ArrayList<>(controller.getAllDishes().stream().map(d->d.category).distinct().toList());cs.add(0,"Все");category.setItems(FXCollections.observableArrayList(cs));category.setValue(selectedCategory!=null&&cs.contains(selectedCategory)?selectedCategory:"Все");menu.setItems(FXCollections.observableArrayList(visibleDishes().stream().map(d->d.name+" | "+d.category+" | "+d.price+" руб.").toList()));history.setItems(FXCollections.observableArrayList(controller.getAllOrders().stream().map(o->"№"+o.id+" | "+o.customerName+" | "+o.status+" | "+o.total+" руб.").toList()));revenue.setText("Выручка: "+controller.getDailyStats()+" руб.");refreshing=false;}
     private void changeSelectedOrderStatus(){int index=history.getSelectionModel().getSelectedIndex();List<Order> orders=controller.getAllOrders();if(index<0||index>=orders.size()){warn("Выберите заказ в истории.");return;}controller.changeOrderStatus(orders.get(index),status.getValue());refreshAll();}
     private void warn(String t){new Alert(Alert.AlertType.WARNING,t).showAndWait();}
