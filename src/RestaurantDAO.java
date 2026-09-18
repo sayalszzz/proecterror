@@ -20,7 +20,7 @@ public class RestaurantDAO {
     }
 
     private void initializeSchema() {
-        // Исправлено Оптимизации 4: Добавлены составные индексы (INDEX) по внешним ключам и статусам
+        // Исправлено Оптимизации 6: Добавлены составные индексы (INDEX) по внешним ключам и статусам
         try (Connection connection = connect(); Statement statement = connection.createStatement()) {
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS dishes (" +
                     "id BIGINT PRIMARY KEY, " +
@@ -51,7 +51,7 @@ public class RestaurantDAO {
                     ") ENGINE=InnoDB;");
 
         } catch (SQLException exception) {
-            // Исправлено Рефакторинга 9: Пробрасываем ошибку, чтобы приложение знало о сбое
+            // Исправлено Рефакторинга 8: Пробрасываем ошибку, чтобы приложение знало о сбое
             throw new RuntimeException("Критическая ошибка инициализации таблиц MySQL", exception);
         }
     }
@@ -69,7 +69,6 @@ public class RestaurantDAO {
     }
 
     public void addDish(Dish dish) {
-        // Исправлено Оптимизации 2 и 11: Используем PreparedStatement (Защита от SQL-инъекций)
         String sql = "INSERT INTO dishes (id, name, category, price, weight, calories, description, available) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection connection = connect(); PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, dish.getId());
@@ -104,7 +103,6 @@ public class RestaurantDAO {
         String orderSql = "INSERT INTO orders (id, customer_name, customer_phone, status, total) VALUES (?, ?, ?, ?, ?)";
         String itemSql = "INSERT INTO order_items (order_id, dish_id) VALUES (?, ?)";
 
-        // Исправлено Оптимизации 7: Весь заказ теперь пишется в рамках одной атомарной транзакции
         try (Connection connection = connect()) {
             connection.setAutoCommit(false);
 
@@ -137,7 +135,7 @@ public class RestaurantDAO {
     }
 
     public List<Order> getAllOrders() {
-        // Исправлено Оптимизации 1 (Решение N+1) и Рефакторинга 4: Один плоский JOIN запрос за 1 раз.
+        // Исправлено Оптимизации 10 (Решение N+1) и Рефакторинга 4: Один плоский JOIN запрос за 1 раз.
         String sql = "SELECT o.id AS order_id, o.customer_name, o.customer_phone, o.status AS order_status, o.total AS order_total, " +
                 "d.id AS dish_id, d.name, d.category, d.price, d.weight, d.calories, d.description, d.available " +
                 "FROM orders o " +

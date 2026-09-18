@@ -17,10 +17,8 @@ import java.util.concurrent.Executors;
 public class RestaurantApp extends Application {
     private RestaurantController controller;
 
-    // Оптимизация: Пул потоков для выполнения всех обращений к БД в фоне
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    // Оптимизация: Локальный кэш, чтобы не мучить базу данных поиском на каждую букву
     private List<Dish> cachedDishes = new ArrayList<>();
     private List<Order> cachedOrders = new ArrayList<>();
 
@@ -42,7 +40,6 @@ public class RestaurantApp extends Application {
         progressIndicator.setMaxSize(24, 24);
         progressIndicator.setVisible(false);
 
-        // Асинхронное заполнение базы дефолтными блюдами при первом старте
         CompletableFuture.runAsync(() -> {
             if (controller.getAllDishes().isEmpty()) {
                 controller.addDish(new Dish.Builder().id(1L).name("Том ям").category("Супы").price(new BigDecimal("420")).nutritionalInfo(350, 310).description("Острый суп").available(true).build());
@@ -129,7 +126,6 @@ public class RestaurantApp extends Application {
         ));
     }
 
-    // Загрузка всех данных из MySQL в фоне ОДИН раз за цикл обновления
     @SuppressWarnings("unchecked")
     private void refreshAll() {
         if (refreshing) return;
@@ -160,7 +156,6 @@ public class RestaurantApp extends Application {
             progressIndicator.setVisible(false);
         }));
     }
-    // Асинхронное создание заказа через паттерны Builder и Value Object
     private void createOrder() {
         if (cartDishes.isEmpty()) { warn("Заказ пуст."); return; }
         String customerName = name.getText();
@@ -189,7 +184,6 @@ public class RestaurantApp extends Application {
         });
     }
 
-    // Асинхронное изменение статуса выбранного в таблице заказа
     private void changeSelectedOrderStatus() {
         int index = history.getSelectionModel().getSelectedIndex();
         if (index < 0 || index >= cachedOrders.size()) { warn("Выберите заказ в истории."); return; }
@@ -203,7 +197,6 @@ public class RestaurantApp extends Application {
         }, executor).thenRun(this::refreshAll);
     }
 
-    // Асинхронное добавление нового блюда в меню через админку снизу
     private void handleAddDish(TextField dishName, TextField dishCategory, TextField dishPrice) {
         try {
             String nameText = dishName.getText();
@@ -244,7 +237,6 @@ public class RestaurantApp extends Application {
 
     @Override
     public void stop() {
-        // Безопасная остановка фонового пула при закрытии крестиком окна приложения
         executor.shutdown();
     }
 
